@@ -8,7 +8,7 @@ Param (
 	[ValidateScript({$_ -match "([\w-]+).crm([0-9]*).dynamics.com"})]
 	[string] $Dyn365Url,
 
-	[PSCredential]$Dyn365Credentials = (Get-Credential -Message 'Please provide credentials for Dynamics 365'),
+#	[PSCredential]$Dyn365Credentials = (Get-Credential -Message 'Please provide credentials for Dynamics 365'),
 
 	[ValidateScript({Test-Path $_ -PathType Leaf})]
 	[string] $LogPath  = $PWD
@@ -48,7 +48,7 @@ function Write-InformationEventLog ([string] $msg, [string] $Log) {
 	}
 }
 
-
+<#
 #Github module can be downloaded here https://github.com/seanmcne/Microsoft.Xrm.Data.PowerShell
 if (Get-Module -Name Microsoft.Xrm.Data.Powershell -ListAvailable) {
 	import-module Microsoft.Xrm.Data.Powershell
@@ -59,7 +59,7 @@ if (Get-Module -Name Microsoft.Xrm.Data.Powershell -ListAvailable) {
 }
 
 #Connect to Dynamics 365 and test if connection is successful
-<#
+
 try {
 	$Dyn365Connection = Connect-CrmOnline -Credential $Dyn365Credentials -ServerUrl $Dyn365Url
 }catch{
@@ -72,14 +72,12 @@ if ($Dyn365Connection.IsReady) {
 } else {
 	Write-ErrorEventLog -msg "Cannoct connect to Dynamics 365 $Dyn365Url with provided credentials $($Dyn365Credentials.username)." -Log $Log
 	exit
-}#>
+}
 
 Invoke-RestMethod   -Headers @{Authorization =("Bearer "+ $Dyn365Connection.OrganizationServiceProxy.SecurityTokenResponse.Token)} `
                         -Uri "$Dyn365Url/$R1000x1000jpg"  `
                         -Method Get
-
-$url = "$Dyn365Url/$($R1000x1000jpg)?_rnd=$(Get-Random)"
-$adaptionSchedule = @(@{ speed= 0; url= "/_static/Tools/Diagnostics/random100x100.jpg" }, @{ speed= .5; url= "/_static/Tools/Diagnostics/random350x350.jpg" }, @{ speed= 1; url= "/_static/Tools/Diagnostics/random750x750.jpg" }, @{ speed= 2; url= "/_static/Tools/Diagnostics/random1000x1000.jpg" }, @{ speed= 4; url= "/_static/Tools/Diagnostics/random1500x1500.jpg" })
+#>
 
 function xhrLoad ([string]$url) {
 	try {
