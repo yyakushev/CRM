@@ -32,8 +32,9 @@
   <ItemGroup>
     <Compile Include="Connect to Dynamics 365 web.ps1" />
     <Compile Include="CRMPerformanceTest.ps1" />
+    <Compile Include="SQLModule.psm1" />
   </ItemGroup>
-  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />  
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <Import Project="$(MSBuildExtensionsPath)\PowerShell Tools for Visual Studio\PowerShellTools.targets" Condition="Exists('$(MSBuildExtensionsPath)\PowerShell Tools for Visual Studio\PowerShellTools.targets')" />
   <Target Name="Build" />
 </Project>
