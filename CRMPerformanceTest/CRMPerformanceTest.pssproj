@@ -32,6 +32,7 @@
   <ItemGroup>
     <Compile Include="Connect to Dynamics 365 web.ps1" />
     <Compile Include="CRMPerformanceTest.ps1" />
+    <Compile Include="CRMPerformanceTestConsole.ps1" />
     <Compile Include="SQLModule.psm1" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />

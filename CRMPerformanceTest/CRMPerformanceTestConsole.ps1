@@ -1,4 +1,4 @@
-﻿#
+#
 # CRMPerformanceTest.ps1
 #
 [cmdletbinding(SupportsShouldProcess=$True)]
@@ -11,14 +11,11 @@ Param (
 #	[PSCredential]$Dyn365Credentials = (Get-Credential -Message 'Please provide credentials for Dynamics 365'),
 
 	[ValidateScript({Test-Path $_ -PathType Leaf})]
-	[string] $LogPath  = $PWD,
-
-	[Parameter(Mandatory=$false, ParameterSetName="sql")][string] $SQLServerName,
-	[Parameter(Mandatory=$false, ParameterSetName="sql")][string] $DatabaseName,
-	[Parameter(Mandatory=$false, ParameterSetName="sql")][string] $TableName
+	[string] $LogPath  = $PWD
 )
-$formatdate = get-date -Format "HH.mm.ss_dd.MM.yyyy"
-$LogName = "$($formatdate)_CRMPerformanceTest.log"
+
+$date = get-date -Format "HH.MM.ss_dd.mm.yyyy"
+$LogName = "$($date)_CRMPerformanceTest.log"
 $script:ErrorActionPreference = "Stop"
 $Log = "$LogPath\$LogName"
 
@@ -117,23 +114,13 @@ function runDownloadTest ($whatToDownload, $trialsToRun, $baseurl) {
         $testResults += @{ downloadTime = $results.downloadTime; downloadedContentLength = $results.downloadedContentLength; downloadSpeed = [math]::floor($results.downloadedContentLength * (1e3 / $results.downloadTime) / 1024) }
         $lastRunSpeed = $results.downloadedContentLength * (1e3 / $results.downloadTime) / 1024 / 1024
 	}
-    [int]$maxDownloadSpeed = $testResults[0].downloadSpeed
-	[int]$minDownloadSpeed = $testResults[0].downloadSpeed
-    [int]$maxDownloadTime = $testResults[0].downloadTime
-	[int]$minDownloadTime = $testResults[0].downloadTime
-
+    $maxDownloadSpeed = 0;
     foreach ($testResult in $testResults) {
-		$maxDownloadSpeed = [math]::Max($maxDownloadSpeed, $testResult.downloadSpeed)
-		$minDownloadSpeed = [math]::Min($minDownloadSpeed, $testResult.downloadSpeed)
-        $maxDownloadTime = [math]::Max($maxDownloadTime, $testResult.downloadTime)
-		$minDownloadTime = [math]::Min($minDownloadTime, $testResult.downloadTime)
+        if ($testResult.downloadTime -gt 0) {
+            $maxDownloadSpeed = [math]::Max($maxDownloadSpeed, $testResult.downloadSpeed);
+		}
 	}
-
-    return @{testResults = $testResults;`
-			maxDownloadSpeed = $maxDownloadSpeed;`
-			minDownloadSpeed = $minDownloadSpeed;`
-			maxDownloadTime = $maxDownloadTime;`
-			minDownloadTime = $minDownloadTime}
+    return @{testResults = $testResults; maxDownloadSpeed = $maxDownloadSpeed}
 }
 
 function runBandwidthTest ($baseurl){
@@ -142,106 +129,41 @@ function runBandwidthTest ($baseurl){
 	$results = runDownloadTest $adaptionSchedule $trialsToRun $baseurl
 	$testResults = $results.testResults
 	$i = 0
-#	$txt = "=== Bandwidth Test Info === `r`n"
-	$avgDownloadSpeed = 0
-<#	foreach ($testResult in $testResults) {
+	$txt = "=== Bandwidth Test Info === `r`n"
+	foreach ($testResult in $testResults) {
         $txt += "Run " + ($i++) + "`r`n"
         $txt += "  Time: " + $testResult.downloadTime + " ms`r`n"
         $txt += "  Blob Size: " + $testResult.downloadedContentLength + " bytes`r`n"
         $txt += "  Speed: " + $testResult.downloadSpeed + " KB/sec`r`n"
-		$avgDownloadSpeed += $testResult.downloadSpeed
-	}#>
-	$avgDownloadSpeed = [math]::floor($avgDownloadSpeed / $testResults.length)
-#    $txt += "Max Download speed: " + $results.maxDownloadSpeed + " KB/sec `r`n"
-#    $txt += "Min Download speed: " + $results.minDownloadSpeed + " KB/sec `r`n"
-#    Write-Host $txt;#>
-	Write-InformationEventLog -msg "Bandwidth test has been finished. The avarage download speed is $avgDownloadSpeed KB, the max download speed is $maxDownloadSpeed KB/sec and the min download speed is $minDownloadSpeed KB/sec" -Log $Log
-    return @{avgDownloadSpeed = $avgDownloadSpeed;maxDownloadSpeed = $results.maxDownloadSpeed;minDownloadSpeed = $results.minDownloadSpeed}
+	}
+	$maxDownloadSpeed = $results.maxDownloadSpeed
+    $maxDownloadSpeedUnit = "KB/sec"
+    if ($maxDownloadSpeed -gt 1024) {
+        $maxDownloadSpeed = [math]::round($maxDownloadSpeed / 1024,2)
+        $maxDownloadSpeedUnit = "MB/sec"
+    }
+    $txt += "Max Download speed: " + $maxDownloadSpeed + " " + $maxDownloadSpeedUnit + "`r`n"
+    Write-Host $txt;
+#    return ([string] $maxDownloadSpeed + " " + $maxDownloadSpeedUnit)
 }
 
 function runLatencyTest ($baseurl) {
     $trialsToRun = 20
     $results = runDownloadTest "/_static/Tools/Diagnostics/smallfile.txt" $trialsToRun $baseurl
     $testResults = $results.testResults
-#	$txt = "=== Latency Test Info === `r`n"
-#    $txt += "Number of times run: " + $trialsToRun + "`r`n"
+	$txt = "=== Latency Test Info === `r`n"
+    $txt += "Number of times run: " + $trialsToRun + "`r`n"
 	$avgDownloadTime = 0
 	$i=0
     foreach ($testResult in $testResults) {
-#        $txt += "Run " + ($i++) + " time: " + $testResult.downloadTime + " ms`r`n"
+        $txt += "Run " + ($i++) + " time: " + $testResult.downloadTime + " ms`r`n"
         $avgDownloadTime += $testResult.downloadTime
     }
     $avgDownloadTime = [math]::floor($avgDownloadTime / $testResults.length)
-	Write-InformationEventLog -msg "Latency test has been finished. The avarage download time is $avgDownloadTime ms." -Log $Log
-#    $txt += "Max Download time: " + $results.maxDownloadTime + " ms `r`n"
-#    $txt += "Min Download time: " + $results.minDownloadTime + " ms `r`n"
-#    $txt += "Average latency: " + $avgDownloadTime + " ms`r`n"
-#    Write-Host $txt
-	return @{avgDownloadTime = $avgDownloadTime;maxDownloadTime = $results.maxDownloadTime;minDownloadTime = $results.minDownloadTime}
+    $txt += "Average latency: " + $avgDownloadTime + " ms`r`n"
+    Write-Host $txt
+#    return [string] $avgDownloadTime + " ms"
 }
 
-function Invoke-SqlCommand {
-	Param (
-        [Parameter(Mandatory=$true)][Alias("Serverinstance")][string]$Server,
-        [Parameter(Mandatory=$true)][string]$Database,
-        [Parameter(Mandatory=$true, ParameterSetName="not_integrated")][string]$Username,
-        [Parameter(Mandatory=$true, ParameterSetName="not_integrated")][string]$Password,
-        [Parameter(Mandatory=$false, ParameterSetName="integrated")][switch]$UseWindowsAuthentication = $true,
-        [Parameter(Mandatory=$true)][string]$Query,
-        [Parameter(Mandatory=$false)][int]$CommandTimeout=0
-    )
-    
-    #build connection string
-    $connstring = "Server=$Server; Database=$Database; "
-    If ($PSCmdlet.ParameterSetName -eq "not_integrated") { $connstring += "User ID=$username; Password=$password;" }
-    ElseIf ($PSCmdlet.ParameterSetName -eq "integrated") { $connstring += "Trusted_Connection=Yes; Integrated Security=SSPI;" }
-    
-    #connect to database
-    $connection = New-Object System.Data.SqlClient.SqlConnection($connstring)
-    $connection.Open()
-    
-    #build query object
-    $command = $connection.CreateCommand()
-    $command.CommandText = $Query
-    $command.CommandTimeout = $CommandTimeout
-    
-    #run query
-    $adapter = New-Object System.Data.SqlClient.SqlDataAdapter $command
-    $dataset = New-Object System.Data.DataSet
-    $adapter.Fill($dataset) | out-null
-    
-    #return the first collection of results or an empty array
-    If ($dataset.Tables[0] -ne $null) {$table = $dataset.Tables[0]}
-    ElseIf ($table.Rows.Count -eq 0) { $table = New-Object System.Collections.ArrayList }
-    
-    $connection.Close()
-    return $table
-}
-
-
-$BandwidthTest = runBandwidthTest $Dyn365Url
-$LatencyTest = runLatencyTest $Dyn365Url
-
-$query = "INSERT INTO [dbo].[$TableName] ([DateTime],`
-				[AvgBandwidth],`
-				[AvgLatency],`
-				[UserName],`
-				[maxDownloadTime],`
-				[minDownloadTime],`
-				[maxDownloadSpeed],`
-				[minDownloadSpeed]) `
-		  VALUES (`'$(get-date -Format "dd.MM.yyyy HH:mm")`',`
-				$($BandwidthTest.avgDownloadSpeed),`
-				$($LatencyTest.avgDownloadTime),`
-				`'$($env:UserName)`',`
-				$($LatencyTest.maxDownloadTime),`
-				$($LatencyTest.minDownloadTime),`
-				$($BandwidthTest.maxDownloadSpeed),`
-				$($BandwidthTest.minDownloadSpeed))"
-try {
-	Invoke-SqlCommand -Server $SQLServerName -Database $DatabaseName -UseWindowsAuthentication -Query $query 
-	Write-InformationEventLog -msg "Result of latancy and bandwidth tests have been inserted into the database $DatabaseName." -Log $Log
-} catch {
-	Write-ErrorEventLog -msg "Result of latancy and bandwidth tests could not be inserted into the database $DatabaseName.`
-							 `r`n`tPlease check the following error: $($Error[0])" -Log $Log
-}
+runBandwidthTest $Dyn365Url
+runLatencyTest $Dyn365Url
