@@ -1,5 +1,5 @@
 ﻿#
-# CRMPerformanceTest.ps1
+# CRMPerformanceTestSQL.ps1
 #
 [cmdletbinding(SupportsShouldProcess=$True)]
 
@@ -214,6 +214,18 @@ function Invoke-SqlCommand {
 
 $BandwidthTest = runBandwidthTest $Dyn365Url
 $LatencyTest = runLatencyTest $Dyn365Url
+
+$BadnwidhtLight = switch ($BandwidthTest.avgDownloadSpeed) {
+	($_ -le 149){ "good"}
+	(($_ -le 249)-and($_ -ge 150)){ "neutral"}
+	($_ -ge 250){ "bad"}
+}
+
+$LatencyLight = switch ($LatencyTest.avgDownloadTime) {
+	($_ -ge 500){ "good"}
+	(($_ -le 459)-and($_ -ge 50)){ "neutral"}
+	($_ -lt 49){ "bad"}
+}
 
 #creation of the insert sql query
 $query = "INSERT INTO [dbo].[$TableName] ([DateTime],`
