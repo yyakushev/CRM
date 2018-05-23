@@ -1,6 +1,7 @@
 ﻿#
 # CRMPerformanceTestSQL.ps1
 #
+# 
 [cmdletbinding(SupportsShouldProcess=$True)]
 
 Param (
@@ -13,9 +14,14 @@ Param (
 	[ValidateScript({Test-Path $_ -PathType Leaf})]
 	[string] $LogPath  = $PWD,
 
-	[Parameter(Mandatory=$false, ParameterSetName="sql")][string] $SQLServerName,
-	[Parameter(Mandatory=$false, ParameterSetName="sql")][string] $DatabaseName,
-	[Parameter(Mandatory=$false, ParameterSetName="sql")][string] $TableName
+	[Parameter(Mandatory=$true)][string] $SQLServerName,
+	[Parameter(Mandatory=$true)][string] $DatabaseName,
+	[Parameter(Mandatory=$true)][string] $TableName,
+
+	[Parameter(Mandatory=$false,ParameterSetName="sqlauthentication")][string] $sqlusername,
+	[Parameter(Mandatory=$false,ParameterSetName="sqlauthentication")][string] $sqluserpassword,
+	[Parameter(Mandatory=$true,ParameterSetName="windowsauthentication")][switch] $usewindowsauthentication = $True
+
 )
 
 $formatdate = get-date -Format "HH.mm.ss_dd.MM.yyyy"
@@ -152,6 +158,9 @@ function runBandwidthTest ($baseurl){
 	$testResults = $results.testResults
 	$i = 0
 	$avgDownloadSpeed = 0
+    foreach ($testResult in $testResults) {
+        $avgDownloadSpeed += $testResult.downloadSpeed
+    }
 	$avgDownloadSpeed = [math]::floor($avgDownloadSpeed / $testResults.length)
 	Write-InformationEventLog -msg "Bandwidth test has been finished. The avarage download speed is $avgDownloadSpeed KB, the max download speed is $maxDownloadSpeed KB/sec and the min download speed is $minDownloadSpeed KB/sec" -Log $Log
     return @{avgDownloadSpeed = $avgDownloadSpeed;maxDownloadSpeed = $results.maxDownloadSpeed;minDownloadSpeed = $results.minDownloadSpeed}
@@ -236,7 +245,7 @@ $query = "INSERT INTO [dbo].[$TableName] ([DateTime],`
 				[minDownloadTime],`
 				[maxDownloadSpeed],`
 				[minDownloadSpeed]) `
-		  VALUES (`'$(get-date -Format "dd.MM.yyyy HH:mm")`',`
+		  VALUES (`'$(get-date -Format "yyyy.MM.dd HH:mm:ss")`',`
 				$($BandwidthTest.avgDownloadSpeed),`
 				$($LatencyTest.avgDownloadTime),`
 				`'$($env:UserName)`',`
@@ -245,8 +254,13 @@ $query = "INSERT INTO [dbo].[$TableName] ([DateTime],`
 				$($BandwidthTest.maxDownloadSpeed),`
 				$($BandwidthTest.minDownloadSpeed))"
 try {
-	Invoke-SqlCommand -Server $SQLServerName -Database $DatabaseName -UseWindowsAuthentication -Query $query 
-	Write-InformationEventLog -msg "Result of latancy and bandwidth tests have been inserted into the database $DatabaseName." -Log $Log
+	if ($PSCmdlet.ParameterSetName -eq "sqlauthentication") {
+		Invoke-SqlCommand -Server $SQLServerName -Database $DatabaseName -Username $sqlusername -Password $sqluserpassword -Query $query 
+		Write-InformationEventLog -msg "Result of latancy and bandwidth tests have been inserted into the database $DatabaseName." -Log $Log
+	} else {
+		Invoke-SqlCommand -Server $SQLServerName -Database $DatabaseName -UseWindowsAuthentication -Query $query 
+		Write-InformationEventLog -msg "Result of latancy and bandwidth tests have been inserted into the database $DatabaseName." -Log $Log
+	}
 } catch {
 	Write-ErrorEventLog -msg "Result of latancy and bandwidth tests could not be inserted into the database $DatabaseName.`
 							 `r`n`tPlease check the following error: $($Error[0])" -Log $Log
